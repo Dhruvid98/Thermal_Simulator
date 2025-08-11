@@ -1,4 +1,4 @@
-# AI/ Thermal Throttling Simulator
+# AI Thermal Throttling Simulator
 ## Overview
 The AI Thermal Throttling Simulator models how data center racks perform under varying TDP loads, ambient temperatures, and cooling strategies. It’s designed to help data center architects, AI infrastructure planners, and HPC engineers anticipate performance loss due to thermal constraints.
 
