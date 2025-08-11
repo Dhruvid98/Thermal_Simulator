@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Rack Thermal Throttling Simulator — Multi-Model</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
+  body{background:linear-gradient(135deg,#0f1a30,#1a0a2e);color:#e0f7ff;min-height:100vh;padding:20px;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+  .container{max-width:1400px;width:100%}
+  header{text-align:center;padding:25px 0;border-bottom:4px solid #ff6a00;margin-bottom:30px;background:rgba(0,10,30,.7);border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,.5);position:relative;overflow:hidden}
+  header::before{content:"";position:absolute;top:0;left:0;width:100%;height:5px;background:linear-gradient(90deg,#ff6a00,#ffd000,#ff6a00);animation:scanline 3s linear infinite}
+  @keyframes scanline{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+  h1{font-size:3rem;margin-bottom:10px;color:#ffb300;text-shadow:0 0 15px rgba(255,179,0,.6);letter-spacing:1px}
+  .subtitle{font-size:1.2rem;color:#00e5ff;max-width:980px;margin:0 auto;text-shadow:0 0 10px rgba(0,229,255,.4)}
+  .dashboard{display:grid;grid-template-columns:1.25fr 1.2fr;gap:30px;margin-bottom:30px}
+  @media (max-width:1100px){.dashboard{grid-template-columns:1fr}}
+
+  .panel{background:rgba(0,20,40,.6);padding:22px;border-radius:15px;box-shadow:0 8px 30px rgba(0,0,0,.4);border:1px solid #1a4a7a}
+  .thermal-viz{background:rgba(0,15,30,.7)}
+  .panel-title{font-size:1.5rem;margin-bottom:16px;color:#00e5ff;display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:2px solid #2a4a6a}
+  .panel-title i{color:#ffb300}
+
+  .controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:900px){.controls-grid{grid-template-columns:1fr}}
+
+  .input-group{margin-bottom:14px}
+  label{display:flex;justify-content:space-between;gap:15px;margin-bottom:8px;font-size:1.02rem;color:#ffcc66}
+  label .value-display{font-weight:700;background:rgba(0,40,80,.5);padding:3px 12px;border-radius:20px;min-width:90px;text-align:center}
+  input[type="range"]{width:100%;height:26px;-webkit-appearance:none;background:linear-gradient(90deg,#0066cc,#00ccff,#0066cc);border-radius:14px;outline:none;border:1px solid #2a8aff}
+  input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;background:#ff9900;border-radius:50%;cursor:pointer;transition:all .2s;box-shadow:0 0 10px rgba(255,153,0,.8);border:2px solid #fff}
+  input[type="range"]::-webkit-slider-thumb:hover{background:#ffcc00;transform:scale(1.08)}
+  .mini-note{font-size:.85rem;color:#9fdfff;opacity:.9}
+
+  /* Catalog cards */
+  .catalog{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:8px}
+  @media (max-width:700px){.catalog{grid-template-columns:1fr}}
+  .card{background:rgba(0,40,80,.35);border:1px solid #2a8aff;border-radius:10px;padding:12px;display:grid;grid-template-columns:auto 112px;gap:10px;align-items:center}
+  .card h4{color:#00e5ff;font-size:1rem;margin-bottom:4px}
+  .card p{color:#ffcc99;font-size:.9rem}
+  .qty{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+  .qty button{width:30px;height:30px;border-radius:6px;border:1px solid #2a8aff;background:rgba(0,40,80,.6);color:#cfe9ff;font-weight:800;cursor:pointer}
+  .qty input{width:46px;text-align:center;border-radius:6px;border:1px solid #2a8aff;background:rgba(0,40,80,.3);color:#e0f7ff;height:30px}
+
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .calculate-btn,.example-btn{padding:12px 16px;border:none;border-radius:10px;font-weight:800;cursor:pointer;letter-spacing:.6px}
+  .calculate-btn{background:linear-gradient(to right,#ff6a00,#ffcc00);color:#002b4d;box-shadow:0 5px 15px rgba(255,106,0,.4)}
+  .calculate-btn:hover{transform:translateY(-2px)}
+  .example-btn{background:rgba(0,40,80,.6);border:1px solid #2a8aff;color:#cfeaff}
+
+  /* Viz & stats */
+  .rack-viz{flex:1;background:rgba(0,10,20,.7);border-radius:10px;padding:16px;margin-top:12px;position:relative;overflow:hidden}
+  .rack{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;align-items:flex-end;min-height:240px}
+  .gpu-slot{width:66px;height:38px;background:rgba(50,100,150,.3);border:1px solid #2a8aff;border-radius:4px;position:relative;overflow:hidden}
+  .gpu-heat{position:absolute;bottom:0;left:0;width:100%;background:#ff6a00;transition:height .4s, background-color .3s}
+
+  .temp-display{text-align:center;padding:14px;background:rgba(0,30,60,.5);border-radius:10px;margin-top:12px;position:relative}
+  .temp-value{font-size:3.4rem;font-weight:800;margin-bottom:6px;color:#00ffcc;text-shadow:0 0 22px rgba(0,255,204,.7);letter-spacing:-1px;transition:all .4s}
+  .status{font-size:1.2rem;font-weight:800;margin-bottom:12px;padding:8px 20px;border-radius:40px;display:inline-block}
+  .throttling{background:rgba(255,0,50,.28);color:#ff4d6d;animation:pulse 1.2s infinite;text-shadow:0 0 8px rgba(255,77,109,.7)}
+  .safe{background:rgba(0,255,100,.28);color:#00ff88;text-shadow:0 0 8px rgba(0,255,136,.7)}
+  @keyframes pulse{0%{opacity:1}50%{opacity:.72}100%{opacity:1}}
+  .fire-animation{position:absolute;bottom:0;left:0;width:100%;height:18px;background:linear-gradient(to top, rgba(255,106,0,.6), transparent);opacity:0;transition:opacity .4s, background .3s}
+  .show-fire{opacity:1}
+
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+  @media (max-width:900px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+  .stat-card{background:rgba(0,40,80,.4);padding:12px;border-radius:10px;text-align:center;border:1px solid #2a8aff}
+  .stat-value{font-size:1.4rem;font-weight:800;margin:4px 0;color:#ffcc00}
+  .stat-label{font-size:.93rem;color:#aaccff}
+
+  /* Blame / Advice */
+  .blame-section{background:rgba(255,60,0,.12);padding:20px;border-radius:15px;box-shadow:0 8px 30px rgba(0,0,0,.4);border:1px solid #ff6a00;margin-top:22px}
+  .culprits{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0}
+  @media (max-width:768px){.culprits{grid-template-columns:1fr}}
+  .culprit{background:rgba(255,60,0,.15);padding:16px;border-radius:10px;text-align:center;border:1px solid #ff6a00}
+  .culprit h4{color:#ff9966;margin-bottom:8px;font-size:1.05rem}
+  .severity{font-size:1.8rem;font-weight:800;margin:8px 0;color:#ff4d4d;text-shadow:0 0 12px rgba(255,77,77,.7)}
+  .recommendations{background:rgba(0,100,200,.15);padding:14px;border-radius:10px;margin-top:12px;border:1px solid #2a8aff}
+  .recommendations h3{color:#00e5ff;margin-bottom:8px;font-size:1.1rem;display:flex;align-items:center;gap:8px}
+  ul{padding-left:24px}
+  li{margin-bottom:8px;font-size:.98rem;color:#cce5ff}
+  li::before{content:"•";color:#ffcc00;font-weight:700;display:inline-block;width:1em;margin-left:-1em}
+  .advice-section{background:rgba(0,160,90,.15);padding:20px;border-radius:15px;box-shadow:0 8px 30px rgba(0,0,0,.4);border:1px solid #00c27a;margin-top:22px}
+  .advice-section .panel-title i{color:#00ff99}
+  .advice-section li::before{color:#00ff99}
+  .hidden{display:none}
+
+  /* Specs */
+  .specs-panel{margin-top:22px}
+  .spec-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .spec-item{display:flex;justify-content:space-between;gap:8px;background:rgba(0,30,60,.45);padding:10px 12px;border:1px solid #2a8aff;border-radius:8px}
+  .spec-key{color:#ffcc66}
+  .badge{display:inline-block;padding:4px 8px;border-radius:16px;background:rgba(0,40,80,.55);border:1px solid #2a8aff;color:#cfeaff;font-size:.85rem}
+
+  /* Breakdown */
+  .breakdown{margin-top:12px;background:rgba(0,30,60,.45);border:1px solid #2a8aff;border-radius:10px;padding:12px}
+  .breakdown h3{font-size:1.05rem;color:#00e5ff;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .breakdown-list{list-style:none}
+  .breakdown-list li{margin:6px 0}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><i class="fas fa-fire"></i> AI RACK THERMAL THROTTLING SIMULATOR</h1>
+    <p class="subtitle">Select multiple GPUs + add CPUs/Networking (kW). Calculates totals, temps, and guidance.</p>
+  </header>
+
+  <div class="dashboard">
+    <div class="panel">
+      <h2 class="panel-title"><i class="fas fa-sliders-h"></i> CONFIGURATION</h2>
+
+      <div class="controls-grid">
+        <div class="input-group">
+          <label>COOLING CAPACITY <span id="coolingValue" class="value-display">25</span> kW</label>
+          <input type="range" id="cooling" min="5" max="60" value="25" step="1" />
+          <div class="mini-note">Typical: 5–60 kW (AI racks on high end)</div>
+        </div>
+        <div class="input-group">
+          <label>AMBIENT TEMPERATURE <span id="ambientValue" class="value-display">22</span>°C</label>
+          <input type="range" id="ambient" min="15" max="35" value="22" step="1" />
+        </div>
+        <div class="input-group">
+          <label>AIRFLOW <span id="airflowValue" class="value-display">2400</span> CFM</label>
+          <input type="range" id="airflow" min="1200" max="5000" value="2400" step="100" />
+        </div>
+        <div class="input-group">
+          <label>RACK HEIGHT (U) <span id="rackHeightValue" class="value-display">42U</span></label>
+          <input type="range" id="rackHeight" min="38" max="52" value="42" step="1" />
+          <div class="mini-note">Common: <span class="badge">42U</span> (38U–52U)</div>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>CPUs / Networking (misc. load, kW)</label>
+        <div class="row">
+          <input type="number" id="miscKW" min="0" step="0.1" value="0" style="width:120px;border-radius:8px;border:1px solid #2a8aff;background:rgba(0,40,80,.3);color:#e0f7ff;height:36px;padding:0 10px" />
+          <button id="exampleBtn" class="example-btn" title="Apply the example: 4×H200, 4×GH200, misc 3.0 kW">
+            <i class="fas fa-magic"></i> Apply Example
+          </button>
+          <button id="calculateBtn" class="calculate-btn"><i class="fas fa-bolt"></i> Simulate</button>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>ACCELERATOR CATALOG (set quantities)</label>
+        <div id="catalog" class="catalog"><!-- filled by JS --></div>
+      </div>
+
+      <div class="breakdown">
+        <h3><i class="fas fa-list-ul"></i> Load Breakdown</h3>
+        <ul id="breakdownList" class="breakdown-list"></ul>
+      </div>
+    </div>
+
+    <div class="panel thermal-viz">
+      <h2 class="panel-title"><i class="fas fa-thermometer-full"></i> THERMAL VISUALIZATION</h2>
+      <div class="rack-viz">
+        <div class="rack" id="rackContainer"></div>
+      </div>
+
+      <div class="temp-display">
+        <div class="temp-value" id="tempValue">—</div>
+        <div class="status safe" id="statusDisplay">WITHIN SAFE LIMITS</div>
+        <div class="fire-animation" id="fireAnimation"></div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total IT Power</div>
+          <div class="stat-value" id="powerPerRack">0.0 kW</div>
+          <div class="stat-label mini-note" id="coolingEffNote">Capacity: 25 kW</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Cooling Efficiency</div>
+          <div class="stat-value" id="coolingEff">—%</div>
+          <div class="stat-label mini-note">Excess/Deficit: <span id="excessHeat">0.0 kW</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Power Density</div>
+          <div class="stat-value" id="powerPerU">0.00 kW/U</div>
+          <div class="stat-label mini-note" id="powerPerUNote">Height: 42U</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Cooling Method (Auto)</div>
+          <div class="stat-value" id="coolingMethod">Air</div>
+          <div class="stat-label mini-note">Liquid recommended if &gt; 30 kW</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blame (only when throttling) -->
+  <div id="blameSection" class="blame-section hidden">
+    <h2 class="panel-title"><i class="fas fa-clipboard-list"></i> THERMAL BLAME REPORT</h2>
+    <div class="culprits">
+      <div class="culprit">
+        <h4><i class="fas fa-snowflake"></i> COOLING SYSTEM</h4>
+        <div class="severity" id="coolingSeverity">—%</div>
+        <p id="coolingMsg">Cooling capacity may be insufficient for load</p>
+      </div>
+      <div class="culprit">
+        <h4><i class="fas fa-server"></i> RACK DENSITY</h4>
+        <div class="severity" id="densitySeverity">—%</div>
+        <p>High kW/U density</p>
+      </div>
+      <div class="culprit">
+        <h4><i class="fas fa-wind"></i> AIRFLOW DESIGN</h4>
+        <div class="severity" id="airflowSeverity">—%</div>
+        <p>Inadequate airflow distribution</p>
+      </div>
+    </div>
+    <div class="recommendations">
+      <h3><i class="fas fa-lightbulb"></i> REMEDIATION STEPS</h3>
+      <ul id="recoList">
+        <li>Increase cooling capacity; consider liquid if &gt; 30 kW/rack</li>
+        <li>Reduce accelerator count or spread across additional U/racks</li>
+        <li>Raise airflow (≥ 3000 CFM) and use hot aisle containment</li>
+        <li>Maintain ambient ≤ 22°C with precision cooling</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Advice (only when safe) -->
+  <div id="adviceSection" class="advice-section">
+    <h2 class="panel-title"><i class="fas fa-check-circle"></i> OPTIMIZATION SUGGESTIONS</h2>
+    <ul id="adviceList"></ul>
+  </div>
+
+  <!-- Rack specs BELOW -->
+  <div class="panel specs-panel">
+    <h2 class="panel-title"><i class="fas fa-ruler-combined"></i> RACK STANDARDS (EIA-310)</h2>
+    <div class="spec-grid">
+      <div class="spec-item"><span class="spec-key">Width</span><span>19 in <span class="badge">(EIA-310)</span></span></div>
+      <div class="spec-item"><span class="spec-key">Height</span><span><span id="specHeight">42U</span> <span class="mini-note">(varies 38U–52U)</span></span></div>
+      <div class="spec-item"><span class="spec-key">Depth</span><span><span id="specDepth">1100</span> mm <span class="mini-note">(1000–1200 mm)</span></span></div>
+      <div class="spec-item"><span class="spec-key">Load Capacity</span><span>1000–3000 lbs</span></div>
+      <div class="spec-item"><span class="spec-key">Power per Rack</span><span>5–60 kW <span class="mini-note">(AI racks on high end)</span></span></div>
+      <div class="spec-item"><span class="spec-key">Cooling Method</span><span>Air or Liquid <span class="mini-note">(Liquid &gt; 30 kW)</span></span></div>
+    </div>
+  </div>
+
+  <footer style="text-align:center;margin-top:22px;padding:14px;color:#88aacc;font-size:.95rem;border-top:1px solid #2a4a6a">
+    <p>AI Rack Thermal Throttling Simulator • Multi-Model Edition</p>
+    <p>© 2025 Datacenter Thermal Dynamics | Demo</p>
+  </footer>
+</div>
+
+<script>
+  /* ===== Catalog (add/edit items here) ===== */
+  const CATALOG = [
+    {id:'H200',  label:'NVIDIA H200 (HBM3e)', tdp:750,  maxTemp:85, type:'GPU',  accel:true},
+    {id:'GH200', label:'NVIDIA GH200 (Grace Hopper)', tdp:1000, maxTemp:90, type:'GPU', accel:true},
+    {id:'H100',  label:'NVIDIA H100 (SXM)', tdp:700,  maxTemp:85, type:'GPU',  accel:true},
+    {id:'A100',  label:'NVIDIA A100 (SXM)', tdp:400,  maxTemp:85, type:'GPU',  accel:true},
+    {id:'MI300X',label:'AMD Instinct MI300X', tdp:750,  maxTemp:90, type:'GPU',  accel:true}
+    // You can extend this list with more accelerators as needed
+  ];
+
+  /* ===== Elements ===== */
+  const coolingSlider = document.getElementById('cooling');
+  const ambientSlider = document.getElementById('ambient');
+  const airflowSlider = document.getElementById('airflow');
+  const rackHeightSlider = document.getElementById('rackHeight');
+
+  const coolingValue = document.getElementById('coolingValue');
+  const ambientValue = document.getElementById('ambientValue');
+  const airflowValue = document.getElementById('airflowValue');
+  const rackHeightValue = document.getElementById('rackHeightValue');
+
+  const miscKWInput = document.getElementById('miscKW');
+  const catalogDiv = document.getElementById('catalog');
+  const breakdownList = document.getElementById('breakdownList');
+
+  const rackContainer = document.getElementById('rackContainer');
+  const tempValue = document.getElementById('tempValue');
+  const statusDisplay = document.getElementById('statusDisplay');
+  const fireAnimation = document.getElementById('fireAnimation');
+
+  const powerPerRack = document.getElementById('powerPerRack');
+  const coolingEff = document.getElementById('coolingEff');
+  const coolingEffNote = document.getElementById('coolingEffNote');
+  const excessHeat = document.getElementById('excessHeat');
+  const powerPerU = document.getElementById('powerPerU');
+  const powerPerUNote = document.getElementById('powerPerUNote');
+  const coolingMethodEl = document.getElementById('coolingMethod');
+
+  const specHeight = document.getElementById('specHeight');
+  const specDepth = document.getElementById('specDepth');
+
+  const blameSection  = document.getElementById('blameSection');
+  const adviceSection = document.getElementById('adviceSection');
+  const adviceList    = document.getElementById('adviceList');
+
+  const coolingSeverity = document.getElementById('coolingSeverity');
+  const coolingMsg = document.getElementById('coolingMsg');
+
+  const exampleBtn = document.getElementById('exampleBtn');
+  const calculateBtn = document.getElementById('calculateBtn');
+
+  /* ===== Helpers ===== */
+  function show(el, yes=true){ el.classList.toggle('hidden', !yes); }
+  function toKW(w){ return w/1000; }
+
+  /* ===== Build catalog UI ===== */
+  const qtyState = {}; // id -> quantity
+  function renderCatalog(){
+    catalogDiv.innerHTML = '';
+    CATALOG.forEach(item => {
+      qtyState[item.id] = qtyState[item.id] ?? 0;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div>
+          <h4>${item.label}</h4>
+          <p>${item.type} • ${item.tdp} W TDP</p>
+        </div>
+        <div class="qty">
+          <button data-id="${item.id}" data-delta="-1">−</button>
+          <input type="number" min="0" step="1" value="${qtyState[item.id]}" data-id="${item.id}" />
+          <button data-id="${item.id}" data-delta="1">+</button>
+        </div>
+      `;
+      catalogDiv.appendChild(card);
+    });
+
+    // Wire buttons & inputs
+    catalogDiv.querySelectorAll('button[data-id]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-id');
+        const delta = parseInt(btn.getAttribute('data-delta'),10);
+        qtyState[id] = Math.max(0, (qtyState[id]||0) + delta);
+        catalogDiv.querySelector(`input[data-id="${id}"]`).value = qtyState[id];
+        calculateThermal();
+      });
+    });
+    catalogDiv.querySelectorAll('input[type="number"][data-id]').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const id = inp.getAttribute('data-id');
+        qtyState[id] = Math.max(0, parseInt(inp.value||'0',10));
+        calculateThermal();
+      });
+    });
+  }
+
+  /* ===== Rack Viz ===== */
+  function createRackVisualization(accelCount) {
+    rackContainer.innerHTML = '';
+    for (let i = 0; i < accelCount; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'gpu-slot';
+      const bar = document.createElement('div');
+      bar.className = 'gpu-heat';
+      bar.style.height = '0%';
+      bar.style.backgroundColor = '#00cc66';
+      slot.appendChild(bar);
+      rackContainer.appendChild(slot);
+    }
+  }
+
+  /* ===== Calculation ===== */
+  function calculateThermal() {
+    // Inputs
+    const CkW = parseFloat(coolingSlider.value);    // cooling capacity (kW)
+    const C = CkW * 1000;                           // W
+    const T_amb = parseInt(ambientSlider.value,10);
+    const airflow = parseInt(airflowSlider.value,10);
+    const H = parseInt(rackHeightSlider.value,10);
+    const miscKW = parseFloat(miscKWInput.value||'0');
+
+    // Sums
+    let sumW = 0;
+    let accelCount = 0;
+    const lines = [];
+    CATALOG.forEach(item=>{
+      const qty = qtyState[item.id]||0;
+      if (qty>0){
+        const w = qty * item.tdp;
+        sumW += w;
+        if (item.accel) accelCount += qty;
+        lines.push(`${qty}× ${item.label} (${item.tdp}W) = ${toKW(w).toFixed(1)} kW`);
+      }
+    });
+    if (miscKW > 0) lines.push(`CPUs/Networking = ${miscKW.toFixed(1)} kW`);
+
+    const P_IT = sumW + miscKW*1000;          // total IT watts
+    const rackKW = toKW(P_IT);                 // kW
+    const densityKWU = H>0 ? (rackKW/H) : 0;   // kW/U
+    const effPct = P_IT>0 ? Math.min(100, Math.round((C / P_IT)*1000)/10) : 0;
+    const surplusW = C - P_IT;
+    const ehKW = toKW(surplusW);
+
+    // Update breakdown
+    breakdownList.innerHTML = lines.length ? lines.map(x=>`<li>${x}</li>`).join('') : '<li>No items selected.</li>';
+
+    // Stats
+    powerPerRack.textContent = `${rackKW.toFixed(1)} kW`;
+    coolingEff.textContent = `${effPct.toFixed(1)}%`;
+    coolingEffNote.textContent = `Capacity: ${CkW.toFixed(1)} kW`;
+    const sign = ehKW>=0 ? '+' : '';
+    excessHeat.textContent = `${sign}${ehKW.toFixed(1)} kW`;
+    powerPerU.textContent = `${densityKWU.toFixed(2)} kW/U`;
+    powerPerUNote.textContent = `Height: ${H}U`;
+
+    const method = rackKW > 30 ? 'Liquid (recommended)' : 'Air';
+    coolingMethodEl.textContent = method;
+
+    // Temperature model (heuristic; depends on shortfall & airflow & count)
+    const deficit = surplusW < 0 ? Math.abs(surplusW) : 0;
+    const surplus = surplusW > 0 ? surplusW : 0;
+    const dT_up   = (airflow>0) ? deficit * 0.004 * (1 + (accelCount / 40)) / (airflow / 1000) : 0;
+    const dT_down = (airflow>0) ? surplus * 0.0005 / (airflow / 1000) : 0;
+    const dT = Math.max(0, dT_up - dT_down);
+    const T_core = T_amb + dT;
+
+    tempValue.textContent = isFinite(T_core) ? Math.round(T_core) + '°C' : '—';
+
+    // Rack viz
+    createRackVisualization(accelCount);
+    const fill = Math.min(100, Math.max(0, (T_core - T_amb) * 2 + 30));
+    document.querySelectorAll('.gpu-heat').forEach(bar=>{
+      bar.style.height = fill + '%';
+      if (T_core > 90) bar.style.backgroundColor = '#ff3300';
+      else if (T_core > 85) bar.style.backgroundColor = '#ff6600';
+      else if (T_core > 75) bar.style.backgroundColor = '#ffcc00';
+      else bar.style.backgroundColor = '#00cc66';
+    });
+
+    // Status + toggles (we don't have per-chip max here; use 85°C as generic limit)
+    const LIMIT = 85;
+    const isThrottling = T_core > LIMIT;
+    const throttleMargin = Math.abs(T_core - LIMIT);
+
+    if (isThrottling) {
+      statusDisplay.textContent = 'THROTTLING DETECTED!';
+      statusDisplay.className = 'status throttling';
+      fireAnimation.classList.add('show-fire');
+      const intensity = Math.min(1, throttleMargin/20);
+      fireAnimation.style.background = `linear-gradient(to top, rgba(255, ${Math.round(60*intensity)}, 0, ${0.2 + intensity*0.6}), transparent)`;
+
+      // Show blame, hide advice
+      show(blameSection, true);
+      show(adviceSection, false);
+
+      // Simple blame heuristic
+      const shortfallPct = rackKW>0 ? Math.max(0, -ehKW)/rackKW*100 : 0;
+      coolingSeverity.textContent = `${Math.max(10, Math.min(75, Math.round(shortfallPct)))}%`;
+      coolingMsg.textContent = rackKW > 30 && method === 'Air'
+        ? 'High rack kW; consider liquid cooling'
+        : 'Cooling capacity may be insufficient for load';
+    } else {
+      statusDisplay.textContent = 'WITHIN SAFE LIMITS';
+      statusDisplay.className = 'status safe';
+      fireAnimation.classList.remove('show-fire');
+
+      // Hide blame, show advice
+      show(blameSection, false);
+      show(adviceSection, true);
+
+      const tips = [];
+      const utilPct = CkW>0 ? Math.round((rackKW/ CkW)*100) : 0;
+      if (ehKW > 0) tips.push(`Cooling headroom: +${ehKW.toFixed(1)} kW (≈${utilPct}% utilized). Bank for bursts or growth.`);
+      if (method === 'Air' && rackKW > 25 && rackKW <= 30) tips.push('Nearing 30 kW. If you plan to scale, prep rear-door HX or liquid loop.');
+      if (method === 'Air' && rackKW <= 20 && ehKW >= 3) tips.push('Consider raising supply air setpoint slightly (+1–2 °C) to save energy.');
+      if (airflow >= 3500 && ehKW > 0) tips.push(`Airflow high (${airflow} CFM). You could trim toward 2500–3000 CFM to cut fan power (monitor temps).`);
+      else if (airflow < 3000 && rackKW >= 25) tips.push('Increase airflow toward ≥3000 CFM under heavy jobs to add margin.');
+      if (densityKWU > 1.2) tips.push(`Power density ${densityKWU.toFixed(2)} kW/U. If expanding, spread accelerators across more U or another rack.`);
+
+      adviceList.innerHTML = tips.length ? tips.map(t=>`<li>${t}</li>`).join('') : '<li>Looks good. Keep monitoring under peak loads.</li>';
+    }
+  }
+
+  /* ===== Events ===== */
+  function initDisplays(){
+    coolingValue.textContent = coolingSlider.value;
+    ambientValue.textContent = ambientSlider.value;
+    airflowValue.textContent = airflowSlider.value;
+    rackHeightValue.textContent = rackHeightSlider.value + 'U';
+    specHeight.textContent = rackHeightSlider.value + 'U';
+    specDepth.textContent = 1100; // default mid-range
+  }
+
+  coolingSlider.addEventListener('input', ()=>{ coolingValue.textContent = coolingSlider.value; calculateThermal(); });
+  ambientSlider.addEventListener('input', ()=>{ ambientValue.textContent = ambientSlider.value; calculateThermal(); });
+  airflowSlider.addEventListener('input', ()=>{ airflowValue.textContent = airflowSlider.value; calculateThermal(); });
+  rackHeightSlider.addEventListener('input', ()=>{ rackHeightValue.textContent = rackHeightSlider.value + 'U'; specHeight.textContent = rackHeightSlider.value + 'U'; calculateThermal(); });
+  miscKWInput.addEventListener('input', ()=>{ calculateThermal(); });
+
+  exampleBtn.addEventListener('click', ()=>{
+    // 4× H200, 4× GH200, CPUs/Networking = 3.0 kW
+    qtyState['H200'] = 4;
+    qtyState['GH200'] = 4;
+    qtyState['H100'] = 0;
+    qtyState['A100'] = 0;
+    qtyState['MI300X'] = 0;
+    miscKWInput.value = 3.0;
+
+    // Reflect in UI
+    renderCatalog();
+    calculateThermal();
+  });
+
+  document.getElementById('calculateBtn').addEventListener('click', calculateThermal());
+
+  /* ===== Boot ===== */
+  renderCatalog();
+  initDisplays();
+  createRackVisualization(0);
+  calculateThermal();
+
+  // subtle flicker when throttling
+  setInterval(()=>{
+    if (statusDisplay.classList.contains('throttling')) {
+      const t = parseInt(tempValue.textContent)||0;
+      const f = (Math.random()*1.8)-0.9;
+      tempValue.textContent = Math.round(t+f) + '°C';
+    }
+  }, 1200);
+</script>
+</body>
+</html>
