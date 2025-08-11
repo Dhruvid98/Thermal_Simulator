@@ -12,4 +12,4 @@ The AI Thermal Throttling Simulator models how data center racks perform under v
 Thermal throttling can lead to significant performance degradation, unplanned downtime, and higher operational costs. This tool helps identify and mitigate risks before hardware deployment.
 
 ## Live Demo
-[View the Simulator](https://github.com/Dhruvid98/Thermal_Simulator/blob/main/index.html) (No download required)
+[View the Simulator](https://dhruvid98.github.io/Thermal_Simulator/) (No download required)
